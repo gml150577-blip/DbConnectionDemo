@@ -4,11 +4,22 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<NpgsqlDataSource>(_ =>
     NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Postgres")!));
 
+builder.Services.AddCors(options =>
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(
+                "http://localhost:5173",
+                "https://db-dashboard-drab.vercel.app"
+              )
+              .AllowAnyHeader()
+              .AllowAnyMethod()));
+
 // Bind to Railway's PORT env var (falls back to 5000 locally)
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 var app = builder.Build();
+
+app.UseCors();
 
 // GET /db/ping — checks if the connection is alive
 app.MapGet("/db/ping", async (NpgsqlDataSource ds) =>
