@@ -6,10 +6,7 @@ builder.Services.AddSingleton<NpgsqlDataSource>(_ =>
 
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
-        policy.WithOrigins(
-                "http://localhost:5173",
-                "https://db-dashboard-drab.vercel.app"
-              )
+        policy.AllowAnyOrigin()
               .AllowAnyHeader()
               .AllowAnyMethod()));
 
