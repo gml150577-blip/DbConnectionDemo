@@ -10,13 +10,11 @@ builder.Services.AddSingleton<NpgsqlDataSource>(_ =>
 
 builder.Services.AddSingleton<IAmazonS3>(_ =>
 {
-    var accessKey = Environment.GetEnvironmentVariable("R2_KEY") ?? builder.Configuration["R2:AccessKeyId"];
-    var secretKey = Environment.GetEnvironmentVariable("R2_SECRET") ?? builder.Configuration["R2:SecretAccessKey"];
-    var endpoint  = Environment.GetEnvironmentVariable("R2_ENDPOINT")  ?? builder.Configuration["R2:Endpoint"];
-    var creds  = new BasicAWSCredentials(accessKey, secretKey);
+    var r2 = builder.Configuration.GetSection("R2");
+    var creds = new BasicAWSCredentials(r2["AccessKeyId"], r2["SecretAccessKey"]);
     var config = new AmazonS3Config
     {
-        ServiceURL = endpoint,
+        ServiceURL = r2["Endpoint"],
         ForcePathStyle = true,
         AuthenticationRegion = "auto"
     };
@@ -83,25 +81,20 @@ app.MapGet("/db/tables", async (NpgsqlDataSource ds) =>
 });
 
 // GET /debug/r2 — confirm env vars are loaded
-app.MapGet("/debug/r2", () =>
+app.MapGet("/debug/r2", (IConfiguration config) => Results.Ok(new
 {
-    // Only expose key NAMES (not values) so we can see what Railway is injecting
-    var r2Keys = Environment.GetEnvironmentVariables()
-        .Cast<System.Collections.DictionaryEntry>()
-        .Where(e => e.Key.ToString()!.StartsWith("R2", StringComparison.OrdinalIgnoreCase))
-        .Select(e => e.Key.ToString())
-        .OrderBy(k => k)
-        .ToList();
-
-    return Results.Ok(new { r2Keys });
-});
+    hasKey = !string.IsNullOrEmpty(config["R2:AccessKeyId"]),
+    hasSecret = !string.IsNullOrEmpty(config["R2:SecretAccessKey"]),
+    endpoint = config["R2:Endpoint"],
+    bucket = config["R2:Bucket"]
+}));
 
 // GET /storage/presign?key=filename.jpg — returns a short-lived presigned URL
 app.MapGet("/storage/presign", (IAmazonS3 s3, IConfiguration config, string key) =>
 {
     try
     {
-        var bucket = Environment.GetEnvironmentVariable("R2_BUCKET") ?? config["R2:Bucket"]!;
+        var bucket = config["R2:Bucket"]!;
         var request = new GetPreSignedUrlRequest
         {
             BucketName = bucket,
