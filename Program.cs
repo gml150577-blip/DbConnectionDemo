@@ -15,7 +15,8 @@ builder.Services.AddSingleton<IAmazonS3>(_ =>
     var config = new AmazonS3Config
     {
         ServiceURL = r2["Endpoint"],
-        ForcePathStyle = true
+        ForcePathStyle = true,
+        AuthenticationRegion = "auto"
     };
     return new AmazonS3Client(creds, config);
 });
