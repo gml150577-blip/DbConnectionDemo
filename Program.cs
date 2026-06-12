@@ -85,17 +85,15 @@ app.MapGet("/db/tables", async (NpgsqlDataSource ds) =>
 // GET /debug/r2 — confirm env vars are loaded
 app.MapGet("/debug/r2", () =>
 {
-    var key = Environment.GetEnvironmentVariable("R2_KEY");
-    var secret = Environment.GetEnvironmentVariable("R2_SECRET");
-    var endpoint = Environment.GetEnvironmentVariable("R2_ENDPOINT");
-    var bucket = Environment.GetEnvironmentVariable("R2_BUCKET");
-    return Results.Ok(new
-    {
-        accessKeyId = key?[..Math.Min(6, key.Length)] + "...",
-        hasSecret = !string.IsNullOrEmpty(secret),
-        endpoint,
-        bucket
-    });
+    // Only expose key NAMES (not values) so we can see what Railway is injecting
+    var r2Keys = Environment.GetEnvironmentVariables()
+        .Cast<System.Collections.DictionaryEntry>()
+        .Where(e => e.Key.ToString()!.StartsWith("R2", StringComparison.OrdinalIgnoreCase))
+        .Select(e => e.Key.ToString())
+        .OrderBy(k => k)
+        .ToList();
+
+    return Results.Ok(new { r2Keys });
 });
 
 // GET /storage/presign?key=filename.jpg — returns a short-lived presigned URL
