@@ -10,11 +10,13 @@ builder.Services.AddSingleton<NpgsqlDataSource>(_ =>
 
 builder.Services.AddSingleton<IAmazonS3>(_ =>
 {
-    var r2 = builder.Configuration.GetSection("R2");
-    var creds = new BasicAWSCredentials(r2["AccessKeyId"], r2["SecretAccessKey"]);
+    var accessKey = Environment.GetEnvironmentVariable("R2__AccessKeyId") ?? builder.Configuration["R2:AccessKeyId"];
+    var secretKey = Environment.GetEnvironmentVariable("R2__SecretAccessKey") ?? builder.Configuration["R2:SecretAccessKey"];
+    var endpoint  = Environment.GetEnvironmentVariable("R2__Endpoint")  ?? builder.Configuration["R2:Endpoint"];
+    var creds  = new BasicAWSCredentials(accessKey, secretKey);
     var config = new AmazonS3Config
     {
-        ServiceURL = r2["Endpoint"],
+        ServiceURL = endpoint,
         ForcePathStyle = true,
         AuthenticationRegion = "auto"
     };
@@ -81,20 +83,27 @@ app.MapGet("/db/tables", async (NpgsqlDataSource ds) =>
 });
 
 // GET /debug/r2 — confirm env vars are loaded
-app.MapGet("/debug/r2", (IConfiguration config) => Results.Ok(new
+app.MapGet("/debug/r2", () =>
 {
-    accessKeyId = config["R2:AccessKeyId"]?[..Math.Min(6, config["R2:AccessKeyId"]?.Length ?? 0)] + "...",
-    hasSecret = !string.IsNullOrEmpty(config["R2:SecretAccessKey"]),
-    endpoint = config["R2:Endpoint"],
-    bucket = config["R2:Bucket"]
-}));
+    var key = Environment.GetEnvironmentVariable("R2__AccessKeyId");
+    var secret = Environment.GetEnvironmentVariable("R2__SecretAccessKey");
+    var endpoint = Environment.GetEnvironmentVariable("R2__Endpoint");
+    var bucket = Environment.GetEnvironmentVariable("R2__Bucket");
+    return Results.Ok(new
+    {
+        accessKeyId = key?[..Math.Min(6, key.Length)] + "...",
+        hasSecret = !string.IsNullOrEmpty(secret),
+        endpoint,
+        bucket
+    });
+});
 
 // GET /storage/presign?key=filename.jpg — returns a short-lived presigned URL
 app.MapGet("/storage/presign", (IAmazonS3 s3, IConfiguration config, string key) =>
 {
     try
     {
-        var bucket = config["R2:Bucket"]!;
+        var bucket = Environment.GetEnvironmentVariable("R2__Bucket") ?? config["R2:Bucket"]!;
         var request = new GetPreSignedUrlRequest
         {
             BucketName = bucket,
