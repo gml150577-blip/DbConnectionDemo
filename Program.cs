@@ -1,8 +1,24 @@
+using Amazon;
+using Amazon.Runtime;
+using Amazon.S3;
+using Amazon.S3.Model;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<NpgsqlDataSource>(_ =>
     NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("Postgres")!));
+
+builder.Services.AddSingleton<IAmazonS3>(_ =>
+{
+    var r2 = builder.Configuration.GetSection("R2");
+    var creds = new BasicAWSCredentials(r2["AccessKeyId"], r2["SecretAccessKey"]);
+    var config = new AmazonS3Config
+    {
+        ServiceURL = r2["Endpoint"],
+        ForcePathStyle = true
+    };
+    return new AmazonS3Client(creds, config);
+});
 
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
@@ -60,6 +76,28 @@ app.MapGet("/db/tables", async (NpgsqlDataSource ds) =>
     catch (Exception ex)
     {
         return Results.Problem(detail: ex.Message, title: "DB query failed", statusCode: 500);
+    }
+});
+
+// GET /storage/presign?key=filename.jpg — returns a short-lived presigned URL
+app.MapGet("/storage/presign", (IAmazonS3 s3, IConfiguration config, string key) =>
+{
+    try
+    {
+        var bucket = config["R2:Bucket"]!;
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = bucket,
+            Key = key,
+            Expires = DateTime.UtcNow.AddMinutes(15),
+            Verb = HttpVerb.GET
+        };
+        var url = s3.GetPreSignedURL(request);
+        return Results.Ok(new { url });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, title: "Presign failed", statusCode: 500);
     }
 });
 
