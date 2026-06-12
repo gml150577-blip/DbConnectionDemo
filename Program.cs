@@ -80,6 +80,15 @@ app.MapGet("/db/tables", async (NpgsqlDataSource ds) =>
     }
 });
 
+// GET /debug/r2 — confirm env vars are loaded
+app.MapGet("/debug/r2", (IConfiguration config) => Results.Ok(new
+{
+    accessKeyId = config["R2:AccessKeyId"]?[..Math.Min(6, config["R2:AccessKeyId"]?.Length ?? 0)] + "...",
+    hasSecret = !string.IsNullOrEmpty(config["R2:SecretAccessKey"]),
+    endpoint = config["R2:Endpoint"],
+    bucket = config["R2:Bucket"]
+}));
+
 // GET /storage/presign?key=filename.jpg — returns a short-lived presigned URL
 app.MapGet("/storage/presign", (IAmazonS3 s3, IConfiguration config, string key) =>
 {
